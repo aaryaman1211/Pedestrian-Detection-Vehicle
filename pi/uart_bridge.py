@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 
 class UartBridge:
     def __init__(self, port: str, baud: int = 115200) -> None:
@@ -22,6 +24,15 @@ class UartBridge:
         # failure below is the actual fix, not just a hang guard.
         self._serial = serial.Serial(self._port, baudrate=self._baud, timeout=0.1, write_timeout=0.3)
         print(f"UART open on {self._port} @ {self._baud} baud")
+
+        # Opening the port toggles DTR, which resets the Arduino into its
+        # bootloader and back -- it takes ~1-2s to reboot and start reading
+        # serial again. The very first open has this covered incidentally
+        # by YOLO model-load time before the first send(), but a mid-loop
+        # reconnect has no such gap: without this, the next write (100ms
+        # later) hits the board mid-reboot, fails, reconnects (resetting it
+        # again), forever -- an infinite reset loop that never succeeds.
+        time.sleep(2.0)
 
     def send(self, payload: bytes) -> None:
         try:
