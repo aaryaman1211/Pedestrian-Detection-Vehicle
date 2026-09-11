@@ -38,12 +38,15 @@ class UartBridge:
         try:
             self._serial.write(payload)
             # The Arduino replies to every command (HB_OK, CLEAR_RECEIVED,
-            # a once-a-second STATUS line, ...) but nothing here ever reads
-            # it. Left undrained, that backs up and can eventually block
-            # the Arduino's own Serial.println() calls, freezing its main
-            # loop from the inside -- indistinguishable from the connection
-            # itself being stuck. Discard it; we don't need the content.
-            self._serial.reset_input_buffer()
+            # a once-a-second STATUS line, ...). DEBUG: print it instead of
+            # silently discarding, to directly confirm the Arduino's own
+            # zone/state matches what the Pi's vision pipeline detected.
+            waiting = self._serial.in_waiting
+            if waiting:
+                reply = self._serial.read(waiting).decode("utf-8", errors="replace")
+                for line in reply.splitlines():
+                    if line.strip():
+                        print(f"  Arduino: {line.strip()}")
         except Exception as exc:
             print(f"UART write failed ({exc}); reopening port")
             self._reconnect()
