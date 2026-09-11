@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# Models & data
+*.pt
+*.onnx
+*.tflite
+runs/
+calibration/
+
+# Logs
+logs/
+*.csv
+*.log
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# ESP32 build
+esp32/.pio/
+esp32/build/
