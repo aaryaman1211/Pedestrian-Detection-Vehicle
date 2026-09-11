@@ -41,3 +41,24 @@ def encode_message(message: DetectionMessage) -> bytes:
 def parse_message(raw: bytes | str) -> DetectionMessage:
     text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
     return DetectionMessage.from_dict(json.loads(text.strip()))
+
+
+# --- Arduino Due firmware protocol ---------------------------------------
+# The Due sketch (arduinodue/arduino_due/arduino_due.ino) speaks a plain-text
+# line protocol, not the JSON format above. These helpers encode the lines
+# it expects: HB (heartbeat), ZONE,<zone>,<distance_m>,<confidence>, and
+# CLEAR (sent while in FAR to accumulate the 2 s latched-stop resume timer).
+
+
+def encode_heartbeat() -> bytes:
+    return b"HB\n"
+
+
+def encode_clear() -> bytes:
+    return b"CLEAR\n"
+
+
+def encode_zone_command(message: DetectionMessage) -> bytes:
+    return (
+        f"ZONE,{message.zone.value},{message.distance_m:.2f},{message.confidence:.2f}\n"
+    ).encode("utf-8")

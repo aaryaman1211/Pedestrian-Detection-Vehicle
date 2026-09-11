@@ -22,7 +22,12 @@ sys.path.insert(0, str(ROOT))
 from shared.config import AppConfig, SafetyZone
 from shared.detector import PedestrianDetector
 from shared.distance import DistanceEstimator
-from shared.protocol import DetectionMessage, encode_message
+from shared.protocol import (
+    DetectionMessage,
+    encode_clear,
+    encode_heartbeat,
+    encode_zone_command,
+)
 from shared.safety import SafetyController
 
 from camera import Camera
@@ -132,9 +137,11 @@ def main() -> None:
                         distance_m=distance_m or 0.0,
                         confidence=confidence,
                         bbox_height_px=bbox_height,
-                        heartbeat=True,
                     )
-                    uart.send(encode_message(msg))
+                    uart.send(encode_heartbeat())
+                    uart.send(encode_zone_command(msg))
+                    if state.zone == SafetyZone.FAR:
+                        uart.send(encode_clear())
                     last_heartbeat = now
 
                 elapsed = time.perf_counter() - loop_start
