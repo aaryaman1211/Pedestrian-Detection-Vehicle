@@ -37,6 +37,13 @@ class UartBridge:
     def send(self, payload: bytes) -> None:
         try:
             self._serial.write(payload)
+            # The Arduino replies to every command (HB_OK, CLEAR_RECEIVED,
+            # a once-a-second STATUS line, ...) but nothing here ever reads
+            # it. Left undrained, that backs up and can eventually block
+            # the Arduino's own Serial.println() calls, freezing its main
+            # loop from the inside -- indistinguishable from the connection
+            # itself being stuck. Discard it; we don't need the content.
+            self._serial.reset_input_buffer()
         except Exception as exc:
             print(f"UART write failed ({exc}); reopening port")
             self._reconnect()
