@@ -1,9 +1,9 @@
 /*
   PROJECT 7 - PEDESTRIAN DETECTION VEHICLE
-  Arduino Due Safety / Motor Controller
+  Arduino Uno Safety / Motor Controller
 
   Hardware:
-    Arduino Due
+    Arduino Uno
     L298N motor driver
     4 x 6V DC gear motors
     HC-SR04 ultrasonic sensor
@@ -11,10 +11,9 @@
     Red LED
     Raspberry Pi communication over USB Serial
 
-  IMPORTANT:
-    Arduino Due GPIO = 3.3V ONLY.
-    HC-SR04 ECHO MUST NOT be connected directly to the Due.
-    Use a resistor voltage divider / level shifter on ECHO.
+  NOTE:
+    Arduino Uno GPIO is 5V, which matches the HC-SR04's 5V logic directly --
+    no voltage divider is needed on ECHO (unlike a 3.3V board such as the Due).
 
   Pi commands:
 
@@ -38,31 +37,38 @@
 // ============================================================
 // PIN DEFINITIONS
 // ============================================================
+//
+// Pins 0/1 (RX/TX) are reserved for Serial communication with the Pi
+// and are never used as GPIO here.
+//
+// The Uno only supports hardware external interrupts on pins 2 and 3
+// (unlike the Due, which supports them on every digital pin), so the
+// encoder inputs are pinned there.
 
 // ---------- L298N ----------
 // Left motor pair
 const int ENA  = 5;     // PWM
-const int IN1  = 22;
-const int IN2  = 23;
+const int IN1  = 7;
+const int IN2  = 8;
 
 // Right motor pair
 const int ENB  = 6;     // PWM
-const int IN3  = 24;
-const int IN4  = 25;
+const int IN3  = 9;
+const int IN4  = 10;
 
 // ---------- HC-SR04 ----------
-const int TRIG_PIN = 30;
-const int ECHO_PIN = 31;
+const int TRIG_PIN = 11;
+const int ECHO_PIN = 12;
 
 // ---------- Warning devices ----------
-const int BUZZER_PIN = 32;
-const int LED_PIN    = 33;
+const int BUZZER_PIN = 13;
+const int LED_PIN    = A0;
 
 // ---------- Optional encoder sensors ----------
 // One sensor for each side for now.
 // We can add the other two later.
-const int LEFT_ENCODER_PIN  = 18;
-const int RIGHT_ENCODER_PIN = 19;
+const int LEFT_ENCODER_PIN  = 2;   // INT0
+const int RIGHT_ENCODER_PIN = 3;   // INT1
 
 
 // ============================================================
@@ -626,7 +632,7 @@ void setup()
 
   Serial.println();
   Serial.println("================================");
-  Serial.println("PROJECT 7 DUE CONTROLLER");
+  Serial.println("PROJECT 7 UNO CONTROLLER");
   Serial.println("READY - MOTORS STOPPED");
   Serial.println("================================");
 }
