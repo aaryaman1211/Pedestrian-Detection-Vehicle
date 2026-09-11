@@ -74,7 +74,7 @@ Pi Camera / Webcam
 | **CAUTION** | < 2 m | 40% speed + buzzer |
 | **DANGER** | < 1 m | Latched emergency stop |
 
-Resume after path clear for **2 s**. Heartbeat loss **> 300 ms** triggers stop.
+Resume after path clear for **2 s**. Heartbeat loss **> 2000 ms** triggers stop (raised from 300ms since real-world Pi inference speed is slower than a 300ms budget allows).
 
 ## Project layout
 
@@ -106,7 +106,7 @@ UART: **115200 baud**, newline-delimited JSON from Pi.
 | Person class filter | `shared/detector.py` |
 | Zone debounce (3 frames) | `shared/safety.py` → `SafetyController` |
 | Latched stop + 2 s resume | `shared/safety.py` → `Esp32PolicyController` + `esp32/` |
-| Heartbeat failsafe | 100 ms heartbeat, 300 ms timeout |
+| Heartbeat failsafe | 100 ms heartbeat, 2000 ms timeout |
 | Trial logging | `pi/main.py --log` |
 
 ## Tuning

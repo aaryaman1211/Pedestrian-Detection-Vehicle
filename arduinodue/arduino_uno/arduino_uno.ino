@@ -25,7 +25,7 @@
     RESET
 
   Safety:
-    - Heartbeat missing >300 ms -> STOP
+    - Heartbeat missing >2000 ms -> STOP
     - Ultrasonic <100 cm -> STOP
     - Camera DANGER -> STOP
     - STOP is latched
@@ -83,7 +83,14 @@ const int CAUTION_SPEED = 60;   // ~40%
 const float DANGER_DISTANCE_CM = 100.0;
 
 // Safety heartbeat
-const unsigned long HEARTBEAT_TIMEOUT_MS = 300;
+//
+// 2000ms (not the classic 300ms) because the Pi only sends a heartbeat
+// once per camera-frame loop iteration, and YOLO inference on that
+// hardware runs at ~1-3 FPS -- a 300ms timeout fired on nearly every
+// cycle, permanently re-latching the emergency stop before the 2s
+// resume window could ever complete. Keep in sync with
+// shared/config.py's heartbeat_timeout_ms.
+const unsigned long HEARTBEAT_TIMEOUT_MS = 2000;
 
 // Resume requirements
 const unsigned long CLEAR_TIME_MS = 2000;

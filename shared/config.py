@@ -36,7 +36,13 @@ class AppConfig:
     debounce_frames: int = 3
     resume_clear_seconds: float = 2.0
     heartbeat_interval_ms: int = 100
-    heartbeat_timeout_ms: int = 300
+    # 2000ms (not the original 300ms) because the Pi's UART send only
+    # happens once per camera-frame loop iteration, and YOLO inference on
+    # this hardware runs at ~1-3 FPS (330ms-1000ms/frame) -- a 300ms
+    # timeout fires on nearly every cycle, permanently re-latching the
+    # emergency stop before the 2s resume window can ever complete. The
+    # Arduino-side constant below must be kept in sync with this value.
+    heartbeat_timeout_ms: int = 2000
 
     # ESP32 behaviour
     caution_speed_factor: float = 0.40

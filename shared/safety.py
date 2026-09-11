@@ -117,7 +117,7 @@ class Esp32PolicyController:
       FAR     -> cruise (100%)
       CAUTION -> 40% speed + buzzer
       DANGER  -> latched stop until path clear for 2 s
-    Heartbeat loss > 300 ms -> latched stop.
+    Heartbeat loss > config.heartbeat_timeout_ms -> latched stop.
     """
 
     def __init__(self, config: AppConfig) -> None:
