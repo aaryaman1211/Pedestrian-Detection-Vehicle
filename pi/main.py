@@ -138,10 +138,10 @@ def main() -> None:
                         confidence=confidence,
                         bbox_height_px=bbox_height,
                     )
-                    uart.send(encode_heartbeat())
-                    uart.send(encode_zone_command(msg))
+                    payload = encode_heartbeat() + encode_zone_command(msg)
                     if state.zone == SafetyZone.FAR:
-                        uart.send(encode_clear())
+                        payload += encode_clear()
+                    uart.send(payload)
                     last_heartbeat = now
 
                 elapsed = time.perf_counter() - loop_start
