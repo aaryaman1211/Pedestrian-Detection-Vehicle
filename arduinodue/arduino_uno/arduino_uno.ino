@@ -33,6 +33,8 @@
 */
 
 #include <Arduino.h>
+#include <string.h>
+#include <stdlib.h>
 
 // ============================================================
 // PIN DEFINITIONS
@@ -255,11 +257,20 @@ void emergencyStop(const char *reason)
 // SERIAL COMMAND PROCESSING
 // ============================================================
 
-void processCommand(String command)
+void processCommand(char *command)
 {
-  command.trim();
+  // Trim in place (equivalent to String::trim(), but no allocation).
+  while (*command == ' ' || *command == '\t')
+    command++;
 
-  if (command.length() == 0)
+  size_t len = strlen(command);
+  while (len > 0 && (command[len - 1] == ' ' || command[len - 1] == '\t'))
+  {
+    command[len - 1] = '\0';
+    len--;
+  }
+
+  if (len == 0)
     return;
 
 
@@ -267,7 +278,7 @@ void processCommand(String command)
   // HEARTBEAT
   // ----------------------------------------------------------
 
-  if (command == "HB")
+  if (strcmp(command, "HB") == 0)
   {
     lastHeartbeat = millis();
     heartbeatDanger = false;
@@ -282,7 +293,7 @@ void processCommand(String command)
   // RESET
   // ----------------------------------------------------------
 
-  if (command == "RESET")
+  if (strcmp(command, "RESET") == 0)
   {
     emergencyLatched = true;
     clearCommandReceived = false;
@@ -300,7 +311,7 @@ void processCommand(String command)
   // CLEAR
   // ----------------------------------------------------------
 
-  if (command == "CLEAR")
+  if (strcmp(command, "CLEAR") == 0)
   {
     clearCommandReceived = true;
 
@@ -322,44 +333,36 @@ void processCommand(String command)
   // ZONE,FAR,2.50,0.95
   // ----------------------------------------------------------
 
-  if (command.startsWith("ZONE,"))
+  if (strncmp(command, "ZONE,", 5) == 0)
   {
-    int firstComma = command.indexOf(',');
-    int secondComma = command.indexOf(',', firstComma + 1);
-    int thirdComma = command.indexOf(',', secondComma + 1);
+    // strtok splits the buffer in place -- safe here since `command`
+    // points at our own mutable serialBuffer, not a string literal.
+    strtok(command, ",");               // "ZONE" (discarded)
+    char *zoneText = strtok(NULL, ",");
+    char *distanceText = strtok(NULL, ",");
+    char *confidenceText = strtok(NULL, ",");
 
-    if (firstComma < 0 ||
-        secondComma < 0 ||
-        thirdComma < 0)
+    if (zoneText == NULL || distanceText == NULL || confidenceText == NULL)
     {
       Serial.println("BAD_ZONE_COMMAND");
       return;
     }
 
-    String zoneText =
-        command.substring(firstComma + 1, secondComma);
-
-    String distanceText =
-        command.substring(secondComma + 1, thirdComma);
-
-    String confidenceText =
-        command.substring(thirdComma + 1);
-
-    cameraDistance = distanceText.toFloat();
-    cameraConfidence = confidenceText.toFloat();
+    cameraDistance = atof(distanceText);
+    cameraConfidence = atof(confidenceText);
 
 
-    if (zoneText == "FAR")
+    if (strcmp(zoneText, "FAR") == 0)
     {
       currentZone = ZONE_FAR;
       cameraClear = true;
     }
-    else if (zoneText == "CAUTION")
+    else if (strcmp(zoneText, "CAUTION") == 0)
     {
       currentZone = ZONE_CAUTION;
       cameraClear = true;
     }
-    else if (zoneText == "DANGER")
+    else if (strcmp(zoneText, "DANGER") == 0)
     {
       currentZone = ZONE_DANGER;
       cameraClear = false;
@@ -384,7 +387,14 @@ void processCommand(String command)
 // SERIAL RECEIVER
 // ============================================================
 
-String serialBuffer = "";
+// Fixed-size buffer instead of the Arduino String class: String's heap
+// allocations fragment the Uno's tiny 2KB SRAM over enough command
+// cycles, eventually failing and locking up the sketch -- this is what
+// was causing the connection to work fine for a while and then
+// permanently stop responding, with no USB-level event involved at
+// all. A plain char buffer never allocates, so it can't fragment.
+char serialBuffer[101];
+uint8_t serialLen = 0;
 
 void readSerialCommands()
 {
@@ -394,20 +404,23 @@ void readSerialCommands()
 
     if (c == '\n' || c == '\r')
     {
-      if (serialBuffer.length() > 0)
+      if (serialLen > 0)
       {
+        serialBuffer[serialLen] = '\0';
         processCommand(serialBuffer);
-        serialBuffer = "";
+        serialLen = 0;
       }
     }
     else
     {
-      serialBuffer += c;
-
       // Prevent runaway buffer
-      if (serialBuffer.length() > 100)
+      if (serialLen < sizeof(serialBuffer) - 1)
       {
-        serialBuffer = "";
+        serialBuffer[serialLen++] = c;
+      }
+      else
+      {
+        serialLen = 0;
       }
     }
   }
