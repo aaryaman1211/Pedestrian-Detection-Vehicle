@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-serial", action="store_true", help="Run without UART (vision-only test)")
     parser.add_argument("--no-ultrasonic", action="store_true", help="Skip HC-SR04 reads")
     parser.add_argument("--log", action="store_true", help="Write trial CSV logs")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="No display output (no monitor / SSH-only session). Prints zone status "
+        "to the console instead. Quit with Ctrl+C.",
+    )
     return parser.parse_args()
 
 
@@ -99,12 +105,16 @@ def main() -> None:
             ["timestamp", "zone", "distance_m", "confidence", "bbox_height_px", "fps"]
         )
 
-    print("Starting Pi pedestrian detection loop. Press 'q' to quit.")
+    if args.headless:
+        print("Starting Pi pedestrian detection loop (headless). Press Ctrl+C to quit.")
+    else:
+        print("Starting Pi pedestrian detection loop. Press 'q' to quit.")
     if log_path:
         print(f"Logging to {log_path}")
 
     frame_interval = 1.0 / config.target_fps
     last_heartbeat = 0.0
+    last_status_print = 0.0
     fps = 0.0
 
     try:
@@ -147,11 +157,17 @@ def main() -> None:
                 elapsed = time.perf_counter() - loop_start
                 fps = 1.0 / max(elapsed, 1e-6)
 
-                annotated = detector.draw_detection(
-                    frame, detection, state.zone.value, distance_m
-                )
-                annotated = draw_hud(annotated, config, state.zone, fps, distance_m)
-                cv2.imshow("Pedestrian Detection Vehicle (Pi)", annotated)
+                if args.headless:
+                    if now - last_status_print >= 1.0:
+                        dist_text = f"{distance_m:.2f} m" if distance_m is not None else "no target"
+                        print(f"Zone: {state.zone.value}  |  {dist_text}  |  {fps:.1f} FPS")
+                        last_status_print = now
+                else:
+                    annotated = detector.draw_detection(
+                        frame, detection, state.zone.value, distance_m
+                    )
+                    annotated = draw_hud(annotated, config, state.zone, fps, distance_m)
+                    cv2.imshow("Pedestrian Detection Vehicle (Pi)", annotated)
 
                 if log_file:
                     csv.writer(log_file).writerow(
@@ -165,7 +181,7 @@ def main() -> None:
                         ]
                     )
 
-                if cv2.waitKey(1) & 0xFF == ord("q"):
+                if not args.headless and cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
                 sleep_time = frame_interval - (time.perf_counter() - loop_start)
@@ -179,7 +195,8 @@ def main() -> None:
             uart.close()
         if ultrasonic:
             ultrasonic.cleanup()
-        cv2.destroyAllWindows()
+        if not args.headless:
+            cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
