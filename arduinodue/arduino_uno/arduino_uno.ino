@@ -78,7 +78,7 @@ const int RIGHT_ENCODER_PIN = 3;   // INT1
 // ============================================================
 
 const int FAR_SPEED     = 150;  // 0-255
-const int CAUTION_SPEED = 60;   // ~40%
+const int CAUTION_SPEED = 30;   // ~20% of FAR_SPEED (was 40%; too fast for CAUTION)
 
 const float DANGER_DISTANCE_CM = 100.0;
 

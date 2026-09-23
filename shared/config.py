@@ -45,7 +45,7 @@ class AppConfig:
     heartbeat_timeout_ms: int = 2000
 
     # ESP32 behaviour
-    caution_speed_factor: float = 0.40
+    caution_speed_factor: float = 0.20  # keep in sync with CAUTION_SPEED in the Arduino sketch
 
     # Ultrasonic (Pi only; Mac simulator can mock values)
     ultrasonic_danger_confirm_m: float = 1.0
