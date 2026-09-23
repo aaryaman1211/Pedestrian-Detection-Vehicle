@@ -84,13 +84,14 @@ const float DANGER_DISTANCE_CM = 100.0;
 
 // Safety heartbeat
 //
-// 2000ms (not the classic 300ms) because the Pi only sends a heartbeat
-// once per camera-frame loop iteration, and YOLO inference on that
-// hardware runs at ~1-3 FPS -- a 300ms timeout fired on nearly every
-// cycle, permanently re-latching the emergency stop before the 2s
-// resume window could ever complete. Keep in sync with
-// shared/config.py's heartbeat_timeout_ms.
-const unsigned long HEARTBEAT_TIMEOUT_MS = 2000;
+// *** TEMPORARY BENCH-TEST VALUE -- REVERT TO 2000 BEFORE ANY REAL DRIVING ***
+// 30000ms so manual Serial Monitor testing (typing HB by hand) isn't a race
+// against the clock. This is NOT safe for actual operation: if the Pi ever
+// crashes or disconnects while driving, the vehicle would keep going for up
+// to 30 seconds before stopping. Set back to 2000 once the Pi is doing the
+// heartbeat automatically again. Keep in sync with shared/config.py's
+// heartbeat_timeout_ms when you do.
+const unsigned long HEARTBEAT_TIMEOUT_MS = 30000;
 
 // Resume requirements
 const unsigned long CLEAR_TIME_MS = 2000;
