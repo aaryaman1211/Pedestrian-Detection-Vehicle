@@ -89,7 +89,7 @@ const int RIGHT_ENCODER_PIN = 3;   // INT1
 // keep in sync with shared/config.py's caution_speed_factor.
 const float CAUTION_SPEED_FACTOR = 0.20;
 
-const float DANGER_DISTANCE_CM = 100.0;
+const float DANGER_DISTANCE_CM = 30.0;  // was 100 -- too trigger-happy on anything nearby
 
 // Safety heartbeat
 //
