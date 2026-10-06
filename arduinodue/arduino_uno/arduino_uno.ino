@@ -92,12 +92,8 @@ const float CAUTION_SPEED_FACTOR = 0.20;
 const float DANGER_DISTANCE_CM = 30.0;  // was 100 -- too trigger-happy on anything nearby
 
 // Safety heartbeat
-//
-// Back to 2000ms now that the Pi (sending the heartbeat automatically)
-// is back in the loop for gamepad control -- the 30000ms bench-test
-// value was only ever safe for manual Serial Monitor typing with
-// nothing actually driving.
-const unsigned long HEARTBEAT_TIMEOUT_MS = 2000;
+// TEMP: 30000ms for bench testing -- restore to 2000 before driving for real.
+const unsigned long HEARTBEAT_TIMEOUT_MS = 30000;
 
 // Resume requirements
 const unsigned long CLEAR_TIME_MS = 2000;
