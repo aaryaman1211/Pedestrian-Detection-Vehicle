@@ -25,12 +25,14 @@ from shared.distance import DistanceEstimator
 from shared.protocol import (
     DetectionMessage,
     encode_clear,
+    encode_drive_command,
     encode_heartbeat,
     encode_zone_command,
 )
 from shared.safety import SafetyController
 
 from camera import Camera
+from gamepad import GamepadController
 from uart_bridge import UartBridge
 from ultrasonic import UltrasonicSensor
 
@@ -48,6 +50,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="No display output (no monitor / SSH-only session). Prints zone status "
         "to the console instead. Quit with Ctrl+C.",
+    )
+    parser.add_argument(
+        "--gamepad",
+        action="store_true",
+        help="Drive manually with a USB gamepad (tank drive: left stick = left motor, "
+        "right stick = right motor, forward only). The camera's DANGER zone can still "
+        "stop the vehicle at any time -- the gamepad has no brake, only throttle.",
     )
     return parser.parse_args()
 
@@ -94,6 +103,7 @@ def main() -> None:
     safety = SafetyController(config)
     uart = None if args.no_serial else UartBridge(args.port, args.baud)
     ultrasonic = None if args.no_ultrasonic else UltrasonicSensor()
+    gamepad = GamepadController() if args.gamepad else None
 
     log_path = None
     log_file = None
@@ -140,6 +150,8 @@ def main() -> None:
                 ultrasonic_m = ultrasonic.read_distance_m() if ultrasonic else None
                 state = safety.update(distance_m, confidence, bbox_height, ultrasonic_m)
 
+                left_speed, right_speed = gamepad.read_speeds() if gamepad else (0, 0)
+
                 now = time.time()
                 if uart and (now - last_heartbeat) >= config.heartbeat_interval_ms / 1000.0:
                     msg = DetectionMessage(
@@ -151,6 +163,8 @@ def main() -> None:
                     payload = encode_heartbeat() + encode_zone_command(msg)
                     if state.zone == SafetyZone.FAR:
                         payload += encode_clear()
+                    if gamepad:
+                        payload += encode_drive_command(left_speed, right_speed)
                     uart.send(payload)
                     last_heartbeat = now
 
@@ -160,7 +174,10 @@ def main() -> None:
                 if args.headless:
                     if now - last_status_print >= 1.0:
                         dist_text = f"{distance_m:.2f} m" if distance_m is not None else "no target"
-                        print(f"Zone: {state.zone.value}  |  {dist_text}  |  {fps:.1f} FPS")
+                        status = f"Zone: {state.zone.value}  |  {dist_text}  |  {fps:.1f} FPS"
+                        if gamepad:
+                            status += f"  |  L={left_speed} R={right_speed}"
+                        print(status)
                         last_status_print = now
                 else:
                     annotated = detector.draw_detection(
@@ -195,6 +212,8 @@ def main() -> None:
             uart.close()
         if ultrasonic:
             ultrasonic.cleanup()
+        if gamepad:
+            gamepad.close()
         if not args.headless:
             cv2.destroyAllWindows()
 

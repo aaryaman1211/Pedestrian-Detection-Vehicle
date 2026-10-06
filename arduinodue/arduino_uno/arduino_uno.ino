@@ -21,6 +21,7 @@
     ZONE,FAR,2.50,0.95
     ZONE,CAUTION,1.50,0.90
     ZONE,DANGER,0.80,0.95
+    DRIVE,180,120          (gamepad-commanded left/right speed, 0-255, forward only)
     CLEAR
     RESET
 
@@ -30,6 +31,12 @@
     - Camera DANGER -> STOP
     - STOP is latched
     - Resume only after CLEAR for 2 seconds
+    - DRIVE only sets desired speed; it can never override a stop. Only
+      the camera (via ZONE,DANGER) can actually brake the vehicle --
+      there is no brake command, releasing the stick just sends
+      DRIVE,0,0. CAUTION still scales DRIVE speed down; DANGER and
+      every other safety fault above still force a full stop
+      regardless of the last DRIVE command received.
 */
 
 #include <Arduino.h>
@@ -77,21 +84,20 @@ const int RIGHT_ENCODER_PIN = 3;   // INT1
 // SETTINGS
 // ============================================================
 
-const int FAR_SPEED     = 150;  // 0-255
-const int CAUTION_SPEED = 30;   // ~20% of FAR_SPEED (was 40%; too fast for CAUTION)
+// Speed now comes from the gamepad via DRIVE commands, not a fixed
+// constant. This only scales that commanded speed down for CAUTION --
+// keep in sync with shared/config.py's caution_speed_factor.
+const float CAUTION_SPEED_FACTOR = 0.20;
 
 const float DANGER_DISTANCE_CM = 100.0;
 
 // Safety heartbeat
 //
-// *** TEMPORARY BENCH-TEST VALUE -- REVERT TO 2000 BEFORE ANY REAL DRIVING ***
-// 30000ms so manual Serial Monitor testing (typing HB by hand) isn't a race
-// against the clock. This is NOT safe for actual operation: if the Pi ever
-// crashes or disconnects while driving, the vehicle would keep going for up
-// to 30 seconds before stopping. Set back to 2000 once the Pi is doing the
-// heartbeat automatically again. Keep in sync with shared/config.py's
-// heartbeat_timeout_ms when you do.
-const unsigned long HEARTBEAT_TIMEOUT_MS = 30000;
+// Back to 2000ms now that the Pi (sending the heartbeat automatically)
+// is back in the loop for gamepad control -- the 30000ms bench-test
+// value was only ever safe for manual Serial Monitor typing with
+// nothing actually driving.
+const unsigned long HEARTBEAT_TIMEOUT_MS = 2000;
 
 // Resume requirements
 const unsigned long CLEAR_TIME_MS = 2000;
@@ -126,6 +132,13 @@ unsigned long clearStartTime = 0;
 
 bool ultrasonicDanger = false;
 bool heartbeatDanger = true;
+
+// Gamepad-commanded speed (0-255, forward only), set by DRIVE commands.
+// Only ever read in the NORMAL DRIVING section of updateMotorState() --
+// every safety check runs before that and returns early, so this can
+// never cause movement during a stop condition.
+int manualLeftSpeed = 0;
+int manualRightSpeed = 0;
 
 
 // ============================================================
@@ -163,9 +176,10 @@ void stopMotors()
 }
 
 
-void driveForward(int speedValue)
+void driveMotors(int leftSpeed, int rightSpeed)
 {
-  speedValue = constrain(speedValue, 0, 255);
+  leftSpeed = constrain(leftSpeed, 0, 255);
+  rightSpeed = constrain(rightSpeed, 0, 255);
 
   // Left side forward
   digitalWrite(IN1, HIGH);
@@ -175,8 +189,8 @@ void driveForward(int speedValue)
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
 
-  analogWrite(ENA, speedValue);
-  analogWrite(ENB, speedValue);
+  analogWrite(ENA, leftSpeed);
+  analogWrite(ENB, rightSpeed);
 }
 
 
@@ -387,6 +401,36 @@ void processCommand(char *command)
   }
 
 
+  // ----------------------------------------------------------
+  // DRIVE COMMAND (manual gamepad control)
+  //
+  // Example:
+  // DRIVE,180,120
+  //
+  // Sets the desired left/right motor speed (0-255, forward only).
+  // This never overrides safety -- see the header comment and
+  // updateMotorState() for why.
+  // ----------------------------------------------------------
+
+  if (strncmp(command, "DRIVE,", 6) == 0)
+  {
+    strtok(command, ",");                 // "DRIVE" (discarded)
+    char *leftText = strtok(NULL, ",");
+    char *rightText = strtok(NULL, ",");
+
+    if (leftText == NULL || rightText == NULL)
+    {
+      Serial.println("BAD_DRIVE_COMMAND");
+      return;
+    }
+
+    manualLeftSpeed = constrain(atoi(leftText), 0, 255);
+    manualRightSpeed = constrain(atoi(rightText), 0, 255);
+
+    return;
+  }
+
+
   Serial.println("UNKNOWN_COMMAND");
 }
 
@@ -546,16 +590,24 @@ void updateMotorState()
 
 
   // ----------------------------------------------------------
-  // NORMAL DRIVING
+  // NORMAL DRIVING -- the gamepad sets speed/steering via DRIVE
+  // commands; zone only scales or blocks it, never sets it directly.
+  // There is no brake command: releasing the stick (DRIVE,0,0) is the
+  // only way the controller reduces speed, and every actual stop
+  // condition (DANGER, heartbeat loss, ultrasonic, latched stop) is
+  // handled above and returns before this point is ever reached.
   // ----------------------------------------------------------
 
   if (currentZone == ZONE_FAR)
   {
-    driveForward(FAR_SPEED);
+    driveMotors(manualLeftSpeed, manualRightSpeed);
   }
   else if (currentZone == ZONE_CAUTION)
   {
-    driveForward(CAUTION_SPEED);
+    driveMotors(
+      manualLeftSpeed * CAUTION_SPEED_FACTOR,
+      manualRightSpeed * CAUTION_SPEED_FACTOR
+    );
   }
   else
   {

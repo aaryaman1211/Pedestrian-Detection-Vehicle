@@ -43,11 +43,14 @@ def parse_message(raw: bytes | str) -> DetectionMessage:
     return DetectionMessage.from_dict(json.loads(text.strip()))
 
 
-# --- Arduino Due firmware protocol ---------------------------------------
-# The Due sketch (arduinodue/arduino_due/arduino_due.ino) speaks a plain-text
+# --- Arduino Uno firmware protocol ----------------------------------------
+# The sketch (arduinodue/arduino_uno/arduino_uno.ino) speaks a plain-text
 # line protocol, not the JSON format above. These helpers encode the lines
-# it expects: HB (heartbeat), ZONE,<zone>,<distance_m>,<confidence>, and
-# CLEAR (sent while in FAR to accumulate the 2 s latched-stop resume timer).
+# it expects: HB (heartbeat), ZONE,<zone>,<distance_m>,<confidence>,
+# DRIVE,<left_speed>,<right_speed> (gamepad-commanded speed, 0-255, forward
+# only -- never a brake; only ZONE,DANGER can actually stop the vehicle),
+# and CLEAR (sent while in FAR to accumulate the 2 s latched-stop resume
+# timer).
 
 
 def encode_heartbeat() -> bytes:
@@ -62,3 +65,9 @@ def encode_zone_command(message: DetectionMessage) -> bytes:
     return (
         f"ZONE,{message.zone.value},{message.distance_m:.2f},{message.confidence:.2f}\n"
     ).encode("utf-8")
+
+
+def encode_drive_command(left_speed: int, right_speed: int) -> bytes:
+    left_speed = max(0, min(255, int(left_speed)))
+    right_speed = max(0, min(255, int(right_speed)))
+    return f"DRIVE,{left_speed},{right_speed}\n".encode("utf-8")
